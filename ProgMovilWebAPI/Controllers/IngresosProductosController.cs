@@ -1,11 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using ProgMovilWebAPI.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProgMovilWebAPI.Data;
 using ProgMovilWebAPI.Models;
+using System.Security.Claims;
 
 namespace ProgMovilWebAPI.Controllers
 {
+    [Authorize(Roles = "Admin,Usuario")]
     [Route("api/[controller]")]
     [ApiController]
     public class IngresosProductosController : ControllerBase
@@ -17,26 +20,53 @@ namespace ProgMovilWebAPI.Controllers
             _context = context;
         }
 
-        // GET: api/IngresosProductos
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<IngresoProducto>>> GetIngresos()
+        private static IngresoProductoDTO ConvertirADTO(IngresoProducto ingreso)
         {
-            return await _context.IngresosProductos
+            return new IngresoProductoDTO
+            {
+                Id = ingreso.Id,
+                ProductoId = ingreso.ProductoId,
+                Producto = ingreso.Producto,
+                ProveedorId = ingreso.ProveedorId,
+                Proveedor = ingreso.Proveedor,
+                Cantidad = ingreso.Cantidad,
+                Fecha = ingreso.Fecha,
+                UsuarioId = ingreso.UsuarioId,
+                Usuario = ingreso.Usuario == null
+                    ? null
+                    : new UsuarioResumenDTO
+                    {
+                        Id = ingreso.Usuario.Id,
+                        Username = ingreso.Usuario.Username
+                    }
+            };
+        }
+
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<IngresoProductoDTO>>> GetIngresos()
+        {
+            var ingresos = await _context.IngresosProductos
                 .AsNoTracking()
                 .Include(i => i.Producto)
                 .Include(i => i.Proveedor)
+                .Include(i => i.Usuario)
                 .OrderByDescending(i => i.Fecha)
                 .ToListAsync();
+
+            return Ok(ingresos.Select(ConvertirADTO).ToList());
         }
 
-        // GET: api/IngresosProductos/5
+
+
         [HttpGet("{id}")]
-        public async Task<ActionResult<IngresoProducto>> GetIngreso(int id)
+        public async Task<ActionResult<IngresoProductoDTO>> GetIngreso(int id)
         {
             var ingreso = await _context.IngresosProductos
                 .AsNoTracking()
                 .Include(i => i.Producto)
                 .Include(i => i.Proveedor)
+                .Include(i => i.Usuario)
                 .FirstOrDefaultAsync(i => i.Id == id);
 
             if (ingreso == null)
@@ -44,10 +74,12 @@ namespace ProgMovilWebAPI.Controllers
                 return NotFound();
             }
 
-            return ingreso;
+            return Ok(ConvertirADTO(ingreso));
         }
 
+
         // GET: api/IngresosProductos/paginado?pageNumber=1&pageSize=10
+
         [HttpGet("paginado")]
         public async Task<ActionResult> GetIngresosPaginados(
             int pageNumber = 1,
@@ -66,6 +98,7 @@ namespace ProgMovilWebAPI.Controllers
                 .AsNoTracking()
                 .Include(i => i.Producto)
                 .Include(i => i.Proveedor)
+                .Include(i => i.Usuario)
                 .OrderByDescending(i => i.Fecha)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
@@ -78,52 +111,83 @@ namespace ProgMovilWebAPI.Controllers
                 TotalRegistros = totalRegistros,
                 TotalPaginas = (int)Math.Ceiling(
                     totalRegistros / (double)pageSize),
-                Datos = ingresos
+                Datos = ingresos.Select(ConvertirADTO).ToList()
             });
         }
 
+
         // POST: api/IngresosProductos
+
         [Authorize(Roles = "Admin")]
         [HttpPost]
-        public async Task<ActionResult<IngresoProducto>> PostIngreso(
-            IngresoProducto ingreso)
+        public async Task<ActionResult<IngresoProductoDTO>> PostIngreso(
+            [FromBody] CrearIngresoProductoDTO dto)
         {
-            if (ingreso.Cantidad <= 0)
+            // Obtener el ID del usuario autenticado desde el JWT
+            var usuarioIdTexto =
+                User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!int.TryParse(usuarioIdTexto, out int usuarioId))
+            {
+                return Unauthorized(
+                    "No se pudo identificar al usuario autenticado.");
+            }
+
+            if (dto.Cantidad <= 0)
             {
                 return BadRequest(
                     "La cantidad ingresada debe ser mayor a 0.");
             }
 
+            // Verificar que el producto exista
             var producto = await _context.Productos
-                .FindAsync(ingreso.ProductoId);
+                .FindAsync(dto.ProductoId);
 
             if (producto == null)
             {
                 return BadRequest("El producto no existe.");
             }
 
+            // Verificar que el proveedor exista
             var proveedor = await _context.Proveedores
-                .FindAsync(ingreso.ProveedorId);
+                .FindAsync(dto.ProveedorId);
 
             if (proveedor == null)
             {
                 return BadRequest("El proveedor no existe.");
             }
 
-            ingreso.Id = 0;
-            ingreso.Fecha = DateTime.UtcNow;
+            // Crear el ingreso con datos controlados por el servidor
+            var ingreso = new IngresoProducto
+            {
+                ProductoId = dto.ProductoId,
+                ProveedorId = dto.ProveedorId,
+                Cantidad = dto.Cantidad,
+                Fecha = DateTime.UtcNow,
+                UsuarioId = usuarioId
+            };
 
-            // El ingreso de mercadería aumenta el stock.
-            producto.Stock += ingreso.Cantidad;
+            // Aumentar el stock del producto
+            producto.Stock += dto.Cantidad;
 
+            // Registrar el movimiento
             _context.IngresosProductos.Add(ingreso);
 
             await _context.SaveChangesAsync();
 
+            // Cargar las relaciones para devolver el DTO completo
+            ingreso.Producto = producto;
+            ingreso.Proveedor = proveedor;
+
+            ingreso.Usuario = await _context.Usuarios
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == usuarioId);
+
             return CreatedAtAction(
                 nameof(GetIngreso),
                 new { id = ingreso.Id },
-                ingreso);
+                ConvertirADTO(ingreso));
         }
+
     }
 }

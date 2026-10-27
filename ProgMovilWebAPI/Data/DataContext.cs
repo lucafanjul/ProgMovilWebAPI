@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿
+using Microsoft.EntityFrameworkCore;
 using ProgMovilWebAPI.Models;
 
 namespace ProgMovilWebAPI.Data
@@ -26,18 +27,15 @@ namespace ProgMovilWebAPI.Data
                 .HasIndex(u => u.Username)
                 .IsUnique();
 
-
             // Precio del producto
             modelBuilder.Entity<Producto>()
                 .Property(p => p.Precio)
                 .HasPrecision(18, 2);
 
-
             // Un producto puede tener solamente una imagen
             modelBuilder.Entity<Imagen>()
                 .HasIndex(i => i.ProductoId)
                 .IsUnique();
-
 
             // Imagen -> Producto
             modelBuilder.Entity<Imagen>()
@@ -46,14 +44,12 @@ namespace ProgMovilWebAPI.Data
                 .HasForeignKey(i => i.ProductoId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-
             // IngresoProducto -> Producto
             modelBuilder.Entity<IngresoProducto>()
                 .HasOne(i => i.Producto)
                 .WithMany()
                 .HasForeignKey(i => i.ProductoId)
                 .OnDelete(DeleteBehavior.Restrict);
-
 
             // IngresoProducto -> Proveedor
             modelBuilder.Entity<IngresoProducto>()
@@ -62,6 +58,12 @@ namespace ProgMovilWebAPI.Data
                 .HasForeignKey(i => i.ProveedorId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // NUEVO: IngresoProducto -> Usuario
+            modelBuilder.Entity<IngresoProducto>()
+                .HasOne(i => i.Usuario)
+                .WithMany()
+                .HasForeignKey(i => i.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // SalidaProducto -> Producto
             modelBuilder.Entity<SalidaProducto>()
@@ -70,12 +72,18 @@ namespace ProgMovilWebAPI.Data
                 .HasForeignKey(s => s.ProductoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-
             // SalidaProducto -> Cliente
             modelBuilder.Entity<SalidaProducto>()
                 .HasOne(s => s.Cliente)
                 .WithMany()
                 .HasForeignKey(s => s.ClienteId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // NUEVO: SalidaProducto -> Usuario
+            modelBuilder.Entity<SalidaProducto>()
+                .HasOne(s => s.Usuario)
+                .WithMany()
+                .HasForeignKey(s => s.UsuarioId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

@@ -1,10 +1,10 @@
-﻿namespace ProgMovilWebAPI.DTOs
+﻿
+namespace ProgMovilWebAPI.DTOs
 {
     public record RegistroDto(
         string Username,
         string Email,
-        string Password,
-        string Rol = "Usuario"
+        string Password
     );
 
     public record LoginDto(

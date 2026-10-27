@@ -7,6 +7,7 @@ namespace ProgMovilWebAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin,Usuario")]
     public class ProductosController : ControllerBase
     {
         private readonly DataContext _context;
@@ -55,6 +56,21 @@ namespace ProgMovilWebAPI.Controllers
             int pageNumber = 1,
             int pageSize = 10)
         {
+            if (pageNumber < 1)
+            {
+                return BadRequest(new
+                {
+                    mensaje = "El número de página debe ser mayor o igual a 1."
+                });
+            }
+
+            if (pageSize < 1 || pageSize > 100)
+            {
+                return BadRequest(new
+                {
+                    mensaje = "El tamaño de página debe estar entre 1 y 100."
+                });
+            }
             var query = _context.Productos
                 .Include(p => p.Categoria)
                 .Include(p => p.Imagenes)
@@ -123,6 +139,16 @@ namespace ProgMovilWebAPI.Controllers
 
             producto.Categoria = null;
 
+            // Un producto nuevo comienza sin movimientos de stock.
+            // El stock se incrementa mediante ingresos de productos.
+            producto.Stock = 0;
+
+            // La imagen se asigna mediante el endpoint de carga.
+            producto.ImagenUrl = null;
+
+            // Evitar asociar imágenes directamente desde el JSON.
+            producto.Imagenes = new List<Imagen>();
+
             _context.Productos.Add(producto);
 
             await _context.SaveChangesAsync();
@@ -157,8 +183,23 @@ namespace ProgMovilWebAPI.Controllers
 
             producto.Categoria = null;
 
-            _context.Entry(producto).State =
-                EntityState.Modified;
+            // Buscar el producto existente
+            var productoExistente = await _context.Productos
+                .FirstOrDefaultAsync(p => p.Id == id);
+
+            if (productoExistente == null)
+            {
+                return NotFound();
+            }
+
+            // Actualizar únicamente los datos editables
+            productoExistente.Nombre = producto.Nombre;
+            productoExistente.Precio = producto.Precio;
+            productoExistente.CategoriaId = producto.CategoriaId;
+
+            // No modificamos ImagenUrl ni Stock.
+            // ImagenUrl se actualiza al subir imágenes.
+            // Stock se actualiza mediante ingresos y salidas.
 
             try
             {
@@ -232,7 +273,7 @@ namespace ProgMovilWebAPI.Controllers
             var yaTieneImagen = await _context.Imagenes
                 .AnyAsync(i => i.ProductoId == id);
 
-            if (yaTieneImagen)
+            if (yaTieneImagen || !string.IsNullOrWhiteSpace(producto.ImagenUrl))
             {
                 return BadRequest(new
                 {
@@ -240,7 +281,6 @@ namespace ProgMovilWebAPI.Controllers
                         "El producto ya tiene una imagen asociada."
                 });
             }
-
 
             // 3. Comprobar que se haya enviado un archivo
 
@@ -365,11 +405,24 @@ namespace ProgMovilWebAPI.Controllers
 
 
             // 14. Guardar información en SQL Server
-
             _context.Imagenes.Add(imagen);
 
-            await _context.SaveChangesAsync();
+            producto.ImagenUrl = imagen.RutaRelativa;
 
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Si falla SQL Server, eliminar el archivo físico
+                if (System.IO.File.Exists(rutaFisica))
+                {
+                    System.IO.File.Delete(rutaFisica);
+                }
+
+                throw;
+            }
 
             // 15. Crear URL pública de la imagen
 

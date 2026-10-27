@@ -1,4 +1,5 @@
-﻿namespace ProgMovilWebAPI.Models
+﻿
+namespace ProgMovilWebAPI.Models
 {
     public class SalidaProducto
     {
@@ -9,6 +10,10 @@
 
         public int ClienteId { get; set; }
         public Cliente? Cliente { get; set; }
+
+        // Usuario que registró la salida
+        public int? UsuarioId { get; set; }
+        public Usuario? Usuario { get; set; }
 
         public int Cantidad { get; set; }
 

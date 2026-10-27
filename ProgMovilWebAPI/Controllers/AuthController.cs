@@ -22,6 +22,7 @@ namespace ProgMovilWebAPI.Controllers
             _jwtService = jwtService;
         }
 
+
         [HttpPost("registro")]
         public async Task<ActionResult<AuthResponseDto>> Registro(
             RegistroDto dto)
@@ -39,7 +40,9 @@ namespace ProgMovilWebAPI.Controllers
                 Username = dto.Username,
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                Rol = dto.Rol
+
+                // Los registros públicos siempre tienen rol Usuario
+                Rol = "Usuario"
             };
 
             _context.Usuarios.Add(usuario);
@@ -55,6 +58,7 @@ namespace ProgMovilWebAPI.Controllers
                 expiracion
             ));
         }
+
 
         [HttpPost("login")]
         public async Task<ActionResult<AuthResponseDto>> Login(

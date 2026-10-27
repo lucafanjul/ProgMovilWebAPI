@@ -8,6 +8,7 @@ namespace ProgMovilWebAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin,Usuario")]
     public class ClientesController : ControllerBase
     {
         private readonly DataContext _context;
