@@ -3,12 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProgMovilWebAPI.Data;
 using ProgMovilWebAPI.Models;
-
+using System.Security.Claims;
+using ProgMovilWebAPI.DTOs;
 namespace ProgMovilWebAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin,Usuario")]
+    [Authorize(Roles = "Admin")]
     public class ClientesController : ControllerBase
     {
         private readonly DataContext _context;
@@ -16,6 +17,70 @@ namespace ProgMovilWebAPI.Controllers
         public ClientesController(DataContext context)
         {
             _context = context;
+        }
+
+        [HttpGet("me")]
+        [Authorize(Roles = "Admin,Usuario")]
+        public async Task<IActionResult> ObtenerMiPerfil()
+        {
+            var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!int.TryParse(claim, out int usuarioId))
+                return Unauthorized();
+
+            var cliente = await _context.Clientes
+                .AsNoTracking()
+                .Where(c => c.UsuarioId == usuarioId)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Nombre,
+                    c.Email,
+                    c.Telefono,
+                    c.Direccion
+                })
+                .FirstOrDefaultAsync();
+
+            if (cliente == null)
+                return NotFound("No existe un perfil de cliente asociado a este usuario.");
+
+            return Ok(cliente);
+        }
+
+        [HttpPut("me")]
+        [Authorize(Roles = "Admin,Usuario")]
+        public async Task<IActionResult> ActualizarMiPerfil(
+            [FromBody] ActualizarMiClienteDTO dto)
+        {
+            var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!int.TryParse(claim, out int usuarioId))
+                return Unauthorized();
+
+            var cliente = await _context.Clientes
+                .FirstOrDefaultAsync(c => c.UsuarioId == usuarioId);
+
+            if (cliente == null)
+                return NotFound("No existe un perfil de cliente asociado a este usuario.");
+
+            if (string.IsNullOrWhiteSpace(dto.Nombre))
+                return BadRequest("El nombre es obligatorio.");
+
+            cliente.Nombre = dto.Nombre.Trim();
+            cliente.Telefono = dto.Telefono?.Trim() ?? string.Empty;
+            cliente.Direccion = dto.Direccion?.Trim() ?? string.Empty;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                mensaje = "Perfil actualizado correctamente.",
+                cliente.Id,
+                cliente.Nombre,
+                cliente.Email,
+                cliente.Telefono,
+                cliente.Direccion
+            });
         }
 
         // GET: api/Clientes

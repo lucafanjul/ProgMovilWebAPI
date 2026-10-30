@@ -8,6 +8,9 @@
 
         public string Email { get; set; } = string.Empty;
 
+        public int? UsuarioId { get; set; }
+
+        public Usuario? Usuario { get; set; }
         public string Telefono { get; set; } = string.Empty;
 
         public string Direccion { get; set; } = string.Empty;

@@ -20,12 +20,21 @@ namespace ProgMovilWebAPI.Data
         public DbSet<IngresoProducto> IngresosProductos { get; set; }
         public DbSet<SalidaProducto> SalidasProductos { get; set; }
 
+        // Nuevas tablas de ventas
+        public DbSet<Venta> Ventas { get; set; }
+        public DbSet<DetalleVenta> DetallesVenta { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Username único
             modelBuilder.Entity<Usuario>()
                 .HasIndex(u => u.Username)
                 .IsUnique();
+            modelBuilder.Entity<Cliente>()
+    .HasOne(c => c.Usuario)
+    .WithOne(u => u.Cliente)
+    .HasForeignKey<Cliente>(c => c.UsuarioId)
+    .OnDelete(DeleteBehavior.Restrict);
 
             // Precio del producto
             modelBuilder.Entity<Producto>()
@@ -58,7 +67,7 @@ namespace ProgMovilWebAPI.Data
                 .HasForeignKey(i => i.ProveedorId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // NUEVO: IngresoProducto -> Usuario
+            // IngresoProducto -> Usuario
             modelBuilder.Entity<IngresoProducto>()
                 .HasOne(i => i.Usuario)
                 .WithMany()
@@ -79,12 +88,57 @@ namespace ProgMovilWebAPI.Data
                 .HasForeignKey(s => s.ClienteId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // NUEVO: SalidaProducto -> Usuario
+            // SalidaProducto -> Usuario
             modelBuilder.Entity<SalidaProducto>()
                 .HasOne(s => s.Usuario)
                 .WithMany()
                 .HasForeignKey(s => s.UsuarioId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Venta -> Usuario
+            modelBuilder.Entity<Venta>()
+                .HasOne(v => v.Usuario)
+                .WithMany()
+                .HasForeignKey(v => v.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Venta -> Detalles
+            modelBuilder.Entity<DetalleVenta>()
+                .HasOne(d => d.Venta)
+                .WithMany(v => v.Detalles)
+                .HasForeignKey(d => d.VentaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // DetalleVenta -> Producto
+            modelBuilder.Entity<DetalleVenta>()
+                .HasOne(d => d.Producto)
+                .WithMany()
+                .HasForeignKey(d => d.ProductoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Importes monetarios
+            modelBuilder.Entity<Venta>()
+                .Property(v => v.Total)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<DetalleVenta>()
+                .Property(d => d.PrecioUnitario)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<DetalleVenta>()
+                .Property(d => d.Subtotal)
+                .HasPrecision(18, 2);
+
+            // Restricciones de integridad
+            modelBuilder.Entity<DetalleVenta>()
+                .ToTable(t => t.HasCheckConstraint(
+                    "CK_DetalleVenta_Cantidad",
+                    "[Cantidad] > 0"));
+
+            modelBuilder.Entity<Venta>()
+                .ToTable(t => t.HasCheckConstraint(
+                    "CK_Venta_Total",
+                    "[Total] >= 0"));
         }
     }
 }

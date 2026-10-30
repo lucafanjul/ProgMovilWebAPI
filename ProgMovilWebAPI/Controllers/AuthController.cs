@@ -27,6 +27,13 @@ namespace ProgMovilWebAPI.Controllers
         public async Task<ActionResult<AuthResponseDto>> Registro(
             RegistroDto dto)
         {
+            if (string.IsNullOrWhiteSpace(dto.Username) ||
+                string.IsNullOrWhiteSpace(dto.Email) ||
+                string.IsNullOrWhiteSpace(dto.Password))
+            {
+                return BadRequest("Todos los campos son obligatorios.");
+            }
+
             var existeUsuario = await _context.Usuarios
                 .AnyAsync(u => u.Username == dto.Username);
 
@@ -35,18 +42,32 @@ namespace ProgMovilWebAPI.Controllers
                 return BadRequest("El nombre de usuario ya existe.");
             }
 
+            await using var transaccion =
+                await _context.Database.BeginTransactionAsync();
+
             var usuario = new Usuario
             {
                 Username = dto.Username,
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-
-                // Los registros públicos siempre tienen rol Usuario
                 Rol = "Usuario"
             };
 
             _context.Usuarios.Add(usuario);
+
+            var cliente = new Cliente
+            {
+                Nombre = dto.Username,
+                Email = dto.Email,
+                Telefono = string.Empty,
+                Direccion = string.Empty,
+                Usuario = usuario
+            };
+
+            _context.Clientes.Add(cliente);
+
             await _context.SaveChangesAsync();
+            await transaccion.CommitAsync();
 
             var (token, expiracion) =
                 _jwtService.GenerarToken(usuario);
@@ -58,6 +79,7 @@ namespace ProgMovilWebAPI.Controllers
                 expiracion
             ));
         }
+
 
 
         [HttpPost("login")]

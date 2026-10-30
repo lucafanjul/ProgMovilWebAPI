@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 namespace ProgMovilWebAPI.Controllers
 {
-    [Authorize(Roles = "Admin,Usuario")]
+    [Authorize(Roles = "Admin")]
     [Route("api/[controller]")]
     [ApiController]
     public class SalidasProductosController : ControllerBase

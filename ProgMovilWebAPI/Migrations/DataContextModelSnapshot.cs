@@ -63,9 +63,53 @@ namespace ProgMovilWebAPI.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("UsuarioId")
+                        .IsUnique()
+                        .HasFilter("[UsuarioId] IS NOT NULL");
+
                     b.ToTable("Clientes");
+                });
+
+            modelBuilder.Entity("ProgMovilWebAPI.Models.DetalleVenta", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Cantidad")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrecioUnitario")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("ProductoId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("VentaId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductoId");
+
+                    b.HasIndex("VentaId");
+
+                    b.ToTable("DetallesVenta", t =>
+                        {
+                            t.HasCheckConstraint("CK_DetalleVenta_Cantidad", "[Cantidad] > 0");
+                        });
                 });
 
             modelBuilder.Entity("ProgMovilWebAPI.Models.Imagen", b =>
@@ -270,6 +314,63 @@ namespace ProgMovilWebAPI.Migrations
                     b.ToTable("Usuarios");
                 });
 
+            modelBuilder.Entity("ProgMovilWebAPI.Models.Venta", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("Ventas", t =>
+                        {
+                            t.HasCheckConstraint("CK_Venta_Total", "[Total] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("ProgMovilWebAPI.Models.Cliente", b =>
+                {
+                    b.HasOne("ProgMovilWebAPI.Models.Usuario", "Usuario")
+                        .WithOne("Cliente")
+                        .HasForeignKey("ProgMovilWebAPI.Models.Cliente", "UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("ProgMovilWebAPI.Models.DetalleVenta", b =>
+                {
+                    b.HasOne("ProgMovilWebAPI.Models.Producto", "Producto")
+                        .WithMany()
+                        .HasForeignKey("ProductoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ProgMovilWebAPI.Models.Venta", "Venta")
+                        .WithMany("Detalles")
+                        .HasForeignKey("VentaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Producto");
+
+                    b.Navigation("Venta");
+                });
+
             modelBuilder.Entity("ProgMovilWebAPI.Models.Imagen", b =>
                 {
                     b.HasOne("ProgMovilWebAPI.Models.Producto", "Producto")
@@ -344,6 +445,17 @@ namespace ProgMovilWebAPI.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("ProgMovilWebAPI.Models.Venta", b =>
+                {
+                    b.HasOne("ProgMovilWebAPI.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("ProgMovilWebAPI.Models.Categoria", b =>
                 {
                     b.Navigation("Productos");
@@ -352,6 +464,16 @@ namespace ProgMovilWebAPI.Migrations
             modelBuilder.Entity("ProgMovilWebAPI.Models.Producto", b =>
                 {
                     b.Navigation("Imagenes");
+                });
+
+            modelBuilder.Entity("ProgMovilWebAPI.Models.Usuario", b =>
+                {
+                    b.Navigation("Cliente");
+                });
+
+            modelBuilder.Entity("ProgMovilWebAPI.Models.Venta", b =>
+                {
+                    b.Navigation("Detalles");
                 });
 #pragma warning restore 612, 618
         }
